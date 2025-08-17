@@ -35,7 +35,6 @@ int main(int argc, char *argv[]) {
     window.setWindowTitle("Simple Network Monitor (Qt)");
     window.resize(520, 380);
 
-    // --- UI ---
     auto *statusLabel = new QLabel("—");
     setStatusBadge(statusLabel, "Ожидание", QColor("#777"));
 
@@ -58,7 +57,6 @@ int main(int argc, char *argv[]) {
     log->setReadOnly(true);
     log->setPlaceholderText("Лог проверок будет здесь…");
 
-    // Компоновка
     auto *top = new QHBoxLayout();
     top->addWidget(new QLabel("Хост:"));
     top->addWidget(hostEdit, /*stretch*/2);
@@ -82,12 +80,11 @@ int main(int argc, char *argv[]) {
     layout->addLayout(mid);
     layout->addWidget(log, /*stretch*/1);
 
-    // --- Логика мониторинга ---
     auto *socket = new QTcpSocket(&window);
-    auto *intervalTimer = new QTimer(&window);      // периодический запуск проверок
-    auto *attemptTimeout = new QTimer(&window);     // таймаут одной попытки
+    auto *intervalTimer = new QTimer(&window);
+    auto *attemptTimeout = new QTimer(&window);
     attemptTimeout->setSingleShot(true);
-    const int singleAttemptMs = 3000;               // 3 секунды на попытку
+    const int singleAttemptMs = 3000;
     auto *elapsed = new QElapsedTimer();
 
     bool probing = false;
@@ -109,11 +106,11 @@ int main(int argc, char *argv[]) {
         }
         probing = false;
         attemptTimeout->stop();
-        socket->abort(); // закрыть соединение на всякий случай
+        socket->abort();
     };
 
     auto runCheck = [&] {
-        if (probing) return; // защита от параллельных запросов
+        if (probing) return;
         const QString host = hostEdit->text().trimmed();
         const quint16 port = static_cast<quint16>(portSpin->value());
         if (host.isEmpty()) {
@@ -121,20 +118,18 @@ int main(int argc, char *argv[]) {
             return;
         }
 
-        // Подготовка
+
         probing = true;
         elapsed->restart();
         latencyLabel->setText("Задержка: …");
         setStatusBadge(statusLabel, "Проверка…", QColor("#777"));
 
-        // Старт
         socket->abort();
         socket->connectToHost(host, port);
         attemptTimeout->start(singleAttemptMs);
         logLine(QString("Проверка TCP %1:%2…").arg(host).arg(port));
     };
 
-    // Сигналы сокета
     QObject::connect(socket, &QTcpSocket::connected, [&] {
         if (!probing) return;
         qint64 ms = elapsed->elapsed();
@@ -160,14 +155,12 @@ int main(int argc, char *argv[]) {
     });
 #endif
 
-    // Таймаут одной попытки
     QObject::connect(attemptTimeout, &QTimer::timeout, [&] {
         if (!probing) return;
         endProbeAs("TIMEOUT", QColor("#ef6c00"), -1);
         logLine(QString("ТАЙМАУТ (%1 мс)").arg(singleAttemptMs));
     });
 
-    // Кнопки
     QObject::connect(checkOnceBtn, &QPushButton::clicked, runCheck);
 
     QObject::connect(startStopBtn, &QPushButton::clicked, [&] {
@@ -179,11 +172,10 @@ int main(int argc, char *argv[]) {
             intervalTimer->start(intervalSpin->value() * 1000);
             startStopBtn->setText("Стоп");
             logLine(QString("Автомониторинг запущен (каждые %1 сек).").arg(intervalSpin->value()));
-            runCheck(); // сразу первая проверка
+            runCheck();
         }
     });
 
-    // Перезапуск таймера при изменении интервала
     QObject::connect(intervalSpin, qOverload<int>(&QSpinBox::valueChanged), [&](int s) {
         if (intervalTimer->isActive()) {
             intervalTimer->start(s * 1000);
